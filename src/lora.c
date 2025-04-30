@@ -86,22 +86,16 @@ u4_t  s2e_netidFilter[4] = { 0xffFFffFF, 0xffFFffFF, 0xffFFffFF, 0xffFFffFF };
 int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbuf) {
     if( len == 0 ) {
     badframe:
-        LOG(MOD_S2E|DEBUG, "Not a LoRaWAN frame: %16.4H", len, frame);
+        LOG(MOD_S2E|DEBUG, "Not a frame: %16.4H", len, frame);
         return 0;
-    }
+    } 
     int ftype = frame[OFF_mhdr] & MHDR_FTYPE;
     if( (len < OFF_df_minlen && ftype != FRMTYPE_PROP) ||
         // (FTYPE_BIT(ftype) & DNFRAME_TYPE) != 0 || --- because of device_mode feature we parse everything
         (frame[OFF_mhdr] & (MHDR_RFU|MHDR_MAJOR)) != MAJOR_V1 ) {
-	goto badframe;
-    }
-    if( ftype == FRMTYPE_PROP || ftype == FRMTYPE_JACC ) {
-        str_t msgtype = ftype == FRMTYPE_PROP ? "propdf" : "jacc";
-        uj_encKVn(buf,
-                  "msgtype",   's', msgtype,
-                  "FRMPayload",'H', len, &frame[0],
-                  NULL);
-        xprintf(lbuf, "%s %16.16H", msgtype, len, &frame[0]);
+        for (int i = 0; i < len; i++) {
+            xprintf(lbuf, "%02X ", frame[i]);  // Imprimir el contenido de frame en formato hexadecimal
+        } 
         return 1;
     }
     if( ftype == FRMTYPE_JREQ || ftype == FRMTYPE_REJOIN ) {
@@ -133,7 +127,7 @@ int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
                   "DevNonce",'i', devnonce,
                   "MIC",     'i', mic,
                   NULL);
-        xprintf(lbuf, "%s MHdr=%02X %s=%:E %s=%:E DevNonce=%d MIC=%d",
+        xprintf(lbuf, "%s MHdr=%02X %s=%:E %s=%:E DevNonce=%d MIC=%d TRAMA JOIN LORAWAN",
                 msgtype, mhdr, rt_joineui, joineui, rt_deveui, deveui, devnonce, mic);
         return 1;
     }
@@ -164,7 +158,7 @@ int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
               "FRMPayload",'H', max(0, len-5-portoff), &frame[portoff+1],
               "MIC",       'i', mic,
               NULL);
-    xprintf(lbuf, "%s mhdr=%02X DevAddr=%08X FCtrl=%02X FCnt=%d FOpts=[%H] %4.2H mic=%d (%d bytes)",
+    xprintf(lbuf, "%s mhdr=%02X DevAddr=%08X FCtrl=%02X FCnt=%d FOpts=[%H] %4.2H mic=%d (%d bytes) ESTA ES LORAWAN ",
             dir, mhdr, devaddr, fctrl, fcnt,
             foptslen, &frame[OFF_fopts],
             max(0, len-4-portoff), &frame[portoff], mic, len);

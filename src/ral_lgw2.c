@@ -297,6 +297,7 @@ static void rxpolling (tmr_t* tmr) {
                 rxjob->rssi = (u1_t)-p->rsig[j].rssi_chan;  
                 rxjob->snr = p->rsig[j].snr*4;
                 rxjob->rctx = j;
+                printf("ral_lgw2");
             }
             rps_t rps = ral_lgw2rps(p);
             rxjob->dr = s2e_rps2dr(&TC->s2ctx, rps);

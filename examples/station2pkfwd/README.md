@@ -12,8 +12,8 @@ The st2pkfwd example requires
 A possible way to setup a compatible python environment is using `virtualenv` and `pip`:
 
 ```
-virtualenv -p python3.6 pyenv
-. pyenv/bin/activate
+virtualenv -p python3.6 myenv
+. myenv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -33,7 +33,7 @@ usage: main.py [-h] [--infosuri INFOSURI] [--muxsuri MUXSURI]
                [--loglevel {ERROR,WARNING,INFO,DEBUG}]
                [routerids [routerids ...]]
 
-positional arguments:
+positional arguments: 
   routerids             Router ids
 
 optional arguments:

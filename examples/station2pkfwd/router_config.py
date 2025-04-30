@@ -78,6 +78,9 @@ class RouterConfig:
         elif region == 'US902':
             self.RX2DR = 8
             self.RX2Freq = 923300000
+        elif region == 'AU915':
+            self.RX2DR = 8
+            self.RX2Freq = 923300000            
         else:
             raise Exception('Unsupported region: %s' % (region))
 

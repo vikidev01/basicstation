@@ -162,6 +162,7 @@ static int read_slave_pipe (slave_t* slave, u1_t* buf, int bufsize, int expcmd, 
                     rxjob->rssi = resp->rssi;
                     rxjob->snr = resp->snr;
                     rxjob->dr = s2e_rps2dr(&TC->s2ctx, resp->rps);
+                    printf("ral_master");
                     if( rxjob->dr == DR_ILLEGAL ) {
                         LOG(MOD_RAL|ERROR, "Unable to map to an up DR: %R", resp->rps);
                     } else {

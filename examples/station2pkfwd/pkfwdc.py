@@ -92,7 +92,9 @@ class PkFwdC():
 
     async def start(self) -> None:
         loop = asyncio.get_event_loop()
+        logger.info("Creating datagram endpoint...")
         self.transport, self.protocol = await loop.create_datagram_endpoint(lambda: self, remote_addr=(self.host, self.port))
+        logger.info("Datagram endpoint created.")
 
 
     async def pause(self) -> None:

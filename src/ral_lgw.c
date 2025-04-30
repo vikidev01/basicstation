@@ -374,7 +374,7 @@ int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t
     uj_enterArray(&D);
     int ok=0, slaveIdx;
     while( (slaveIdx = uj_nextSlot(&D)) >= 0 ) {
-        dbuf_t json = uj_skipValue(&D);
+        dbuf_t json = uj_skipValue(&D); 
         if( slaveIdx == 0 ) {
             struct sx130xconf sx130xconf;
             int status = 0;

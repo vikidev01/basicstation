@@ -940,7 +940,7 @@ void uj_encKV (ujbuf_t* b, const char* key, char type, ...) {
     va_end(ap);
 }
 
-void uj_encKVn (ujbuf_t* b, ...) {
+void uj_encKVn (ujbuf_t* b, ...) { 
     va_list ap;
     va_start(ap, b);
     do {
