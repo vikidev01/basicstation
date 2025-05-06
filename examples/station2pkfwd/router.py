@@ -108,7 +108,13 @@ class Router:
             await asyncio.sleep(0.3)
 
             while True:
-                s = json.loads(await websocket.recv())
+
+                raw_msg = await websocket.recv()
+                try:
+                    s = json.loads(raw_msg)
+                except json.JSONDecodeError as e:
+                    print("ERROR de JSON:", e)
+                    continue  # o break, según si querés cortar la conexión o no
                 
                 msgtype = s.get('msgtype')
                 #logger.info('%s: on_ws: msgtype: %s' % (self, msgtype))
@@ -167,18 +173,28 @@ class Router:
                     self.pkfwdstat['txnb'] += 1
                     token = s['diid']
                     self.pkfwdc.push_txack(token)
-                elif msgtype == 'lora':
+                else:
+                    self.pkfwdstat['rxnb'] += 1
+                    self.pkfwdstat['rxok'] += 1
+                    self.pkfwdstat['rxfw'] += 1
+
+                    xtime = s['upinfo']['xtime']
                     self.last_xtime = xtime
                     rxtime = s['upinfo']['rxtime']
                     rssi = s['upinfo']['rssi']
                     snr = s['upinfo']['snr']
-                else:
-                    logger.info('%s: CREO QUE LORA: %s: %s' % (self, msgtype, s))
+                    datr = self.config.dr2sfbw.get(s['DR'], 'SF7BW125')  # Valor por defecto
+
+                     
+                    self.pkfwdc.push_rxpk(rxtime, xtime2bits32(xtime), self.chan, self.rfch, s['Freq'], datr, rssi, snr, pdu_ba)
+                    #logger.warning('%s: lora msg sin payload: %s', self, s)
+                    #logger.info('%s: mensaje LORA completo:\n%s', self, json.dumps(s, indent=2))
+
         except Exception as exc:
             logger.error('%s: server socket failed: %s', self, exc, exc_info=True)
         finally:
             self.websocket = None
-            await self.pkfwdc.pause()
+            await self.pkfwdc.pause() 
 
 
     def get_pkfwd_stat(self) -> MutableMapping[str,Any]:

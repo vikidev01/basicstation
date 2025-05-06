@@ -82,8 +82,13 @@
 uL_t* s2e_joineuiFilter;
 u4_t  s2e_netidFilter[4] = { 0xffFFffFF, 0xffFFffFF, 0xffFFffFF, 0xffFFffFF };
 
+void bin2hex(char* dst, const u1_t* src, int len) {
+    for (int i = 0; i < len; i++)
+        sprintf(dst + i * 2, "%02X", src[i]);
+    dst[len * 2] = '\0';
+}
 
-int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbuf) {
+int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbuf, bool* is_lorawan) {
     if( len == 0 ) {
     badframe:
         LOG(MOD_S2E|DEBUG, "Not a frame: %16.4H", len, frame);
@@ -93,10 +98,19 @@ int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
     if( (len < OFF_df_minlen && ftype != FRMTYPE_PROP) ||
         // (FTYPE_BIT(ftype) & DNFRAME_TYPE) != 0 || --- because of device_mode feature we parse everything
         (frame[OFF_mhdr] & (MHDR_RFU|MHDR_MAJOR)) != MAJOR_V1 ) {
+        
+        // Convertir la trama completa a string hexadecimal
+        char payload_hex[len * 2 + 1];
+        bin2hex(payload_hex, frame, len);
 
-        for (int i = 0; i < len; i++) {
-            xprintf(lbuf, "%02X ", frame[i]);  // Imprimir el contenido de frame en formato hexadecimal
-        } 
+        // Agregar al buffer los campos como se hace con uj_encKVn
+        uj_encKVn(buf,
+            "msgtype", 's', "lora",
+            "payload", 's', payload_hex,
+            NULL
+        );
+        xprintf(lbuf, "Payload=%s (trama no-LW, %d bytes)", payload_hex, len);
+        *is_lorawan = false; 
         return 1;
     }
     if( ftype == FRMTYPE_JREQ || ftype == FRMTYPE_REJOIN ) {
@@ -108,7 +122,7 @@ int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
             uL_t* f = s2e_joineuiFilter-2;
             while( *(f += 2) ) {
                 if( joineui >= f[0] && joineui <= f[1] )
-                    goto out1;
+                    goto out1; 
             }
             
             xprintf(lbuf, "Join EUI %E filtered", joineui);
@@ -130,6 +144,7 @@ int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
                   NULL);
         xprintf(lbuf, "%s MHdr=%02X %s=%:E %s=%:E DevNonce=%d MIC=%d TRAMA JOIN LORAWAN",
                 msgtype, mhdr, rt_joineui, joineui, rt_deveui, deveui, devnonce, mic);
+        *is_lorawan = true;
         return 1;
     }
     u1_t foptslen = frame[OFF_fctrl] & 0xF;
@@ -160,9 +175,8 @@ int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
               "MIC",       'i', mic,
               NULL);
     xprintf(lbuf, "%s mhdr=%02X DevAddr=%08X FCtrl=%02X FCnt=%d FOpts=[%H] %4.2H mic=%d (%d bytes) ESTA ES LORAWAN ",
-            dir, mhdr, devaddr, fctrl, fcnt,
-            foptslen, &frame[OFF_fopts],
-            max(0, len-4-portoff), &frame[portoff], mic, len);
+            dir, mhdr, devaddr, fctrl, fcnt, foptslen, &frame[OFF_fopts], max(0, len-4-portoff), &frame[portoff], mic, len);
+    *is_lorawan = true; 
     return 1;
 }
 

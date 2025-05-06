@@ -37,7 +37,7 @@
 
 extern uL_t* s2e_joineuiFilter;
 extern u4_t  s2e_netidFilter[4];
-int  s2e_parse_lora_frame(ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbuf);
+int  s2e_parse_lora_frame(ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbuf, bool* is_lorawan);
 void s2e_make_beacon (uint8_t* layout, sL_t epoch_secs, int infodesc, double lat, double lon, uint8_t* buf);
 
 

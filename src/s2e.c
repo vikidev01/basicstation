@@ -27,7 +27,7 @@
  */
 
 #include <stdio.h>
-#include "s2conf.h"
+#include "s2conf.h" 
 #include "uj.h"
 #include "ral.h"
 #include "s2e.h"
@@ -121,7 +121,6 @@ void s2e_addRxjob (s2ctx_t* s2ctx, rxjob_t* rxjob) {
     // Check for mirror frame (reflection on a neighboring frequency)
     
     for( rxjob_t* p = &s2ctx->rxq.rxjobs[s2ctx->rxq.first]; p < rxjob; p++ ) {
-        // printf("Antes--------------------------------------------------");
         if( p->dr == rxjob->dr &&
             p->len == rxjob->len &&
             memcmp(&s2ctx->rxq.rxdata[p->off], &s2ctx->rxq.rxdata[rxjob->off], rxjob->len) == 0 ) {
@@ -165,46 +164,33 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
                     j->freq, j->dr, s2e_dr2rps(s2ctx, j->dr), j->snr/4.0, -j->rssi, j->xtime);
 
         uj_encOpen(&sendbuf, '{');
-
-        bool is_lorawan = s2e_parse_lora_frame(&sendbuf, &s2ctx->rxq.rxdata[j->off], j->len, lbuf.buf ? &lbuf : NULL);
-
-        if( !is_lorawan ) {
-            // Si no es LoRaWAN, mostrar info básica igual
-            uj_encKVn(&sendbuf,
-                    "RX",        'F', j->freq,
-                    "DR",        'i', j->dr,
-                    "R",         'g', s2e_dr2rps(s2ctx, j->dr),
-                    "snr",       'g', j->snr / 4.0,
-                    "rssi",      'i', -j->rssi,
-                    "xtime",     'I', j->xtime,
-                    NULL);
-                if( lbuf.buf )
-                    log_specialFlush(lbuf.pos);
-        } else {
-            // Si es trama LoRaWAN
-            if( lbuf.buf )
-            log_specialFlush(lbuf.pos);
-
-            double reftime = 0.0;
-            if( s2ctx->muxtime ) {
-                reftime = s2ctx->muxtime +
-                    ts_normalizeTimespanMCU(rt_getTime()-s2ctx->reftime) / 1e6;
-            }
-            uj_encKVn(&sendbuf,
-                    "RefTime",  'T', reftime,
-                    "DR",       'i', j->dr,
-                    "Freq",     'i', j->freq,
-                    "upinfo",   '{',
-                    /**/ "rctx",    'I', j->rctx,
-                    /**/ "xtime",   'I', j->xtime,
-                    /**/ "gpstime", 'I', ts_xtime2gpstime(j->xtime),
-                    /**/ "fts",     'i', j->fts,
-                    /**/ "rssi",    'i', -(s4_t)j->rssi,
-                    /**/ "snr",     'g', j->snr/4.0,
-                    /**/ "rxtime",  'T', rt_getUTC()/1e6,
-                    "}",
-                    NULL);
+        bool is_lorawan = false;
+        if( !s2e_parse_lora_frame(&sendbuf, &s2ctx->rxq.rxdata[j->off], j->len, lbuf.buf ? &lbuf : NULL, &is_lorawan) ) {
+            // Frame failed sanity checks or stopped by filters
+            sendbuf.pos = 0;
+            continue;
         }
+        if( lbuf.buf )
+            log_specialFlush(lbuf.pos);
+        double reftime = 0.0;
+        if( s2ctx->muxtime ) {
+            reftime = s2ctx->muxtime +
+                ts_normalizeTimespanMCU(rt_getTime()-s2ctx->reftime) / 1e6;
+        }
+        uj_encKVn(&sendbuf,
+                  "RefTime",  'T', reftime,
+                  "DR",       'i', j->dr,
+                  "Freq",     'i', j->freq,
+                  "upinfo",   '{',
+                  /**/ "rctx",    'I', j->rctx,
+                  /**/ "xtime",   'I', j->xtime,
+                  /**/ "gpstime", 'I', ts_xtime2gpstime(j->xtime),
+                  /**/ "fts",     'i', j->fts,
+                  /**/ "rssi",    'i', -(s4_t)j->rssi,
+                  /**/ "snr",     'g', j->snr/4.0,
+                  /**/ "rxtime",  'T', rt_getUTC()/1e6,
+                  "}",
+                  NULL);
         uj_encClose(&sendbuf, '}');
         if( !xeos(&sendbuf) ) {
             LOG(MOD_S2E|ERROR, "JSON encoding exceeds available buffer space: %d", sendbuf.bufsize);
@@ -214,6 +200,7 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
         }
     }
 }
+
 
 
 
