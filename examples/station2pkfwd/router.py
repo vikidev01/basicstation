@@ -55,7 +55,7 @@ class Router:
         self.routerid = routerid
         self.config = config
         self.pkfwdc = pkfwdc.PkFwdC(pkfwduri, routerid, config, self.on_pull_resp, self.get_pkfwd_stat)
-        self.websocket = None  # type:Optional[WSSP]
+        self.websocket = None           # type:Optional[WSSP]
         empty_list_fn = list            # type: Callable[[],List[Mapping{str,Any]]]
         self.ws_write_bgtask = BgTask(self.ws_write_bgtask_func, empty_list_fn, 'ws_write_bgtask', 10.0)
         self.ws_write_bgtask.start()
@@ -70,7 +70,8 @@ class Router:
             'rxok': 0,     # number | Number of radio packets received with a valid PHY CRC
             'rxfw': 0,     # number | Number of radio packets forwarded (unsigned integer)
             'dwnb': 0,     # number | Number of downlink datagrams received (unsigned integer)
-            'txnb': 0      # number | Number of packets emitted (unsigned integer)
+            'txnb': 0,     # number | Number of packets emitted (unsigned integer)
+            'lora': 0      # number | Number of packets lora recived (unsigned integer)
         }
         
         self.last_xtime = 0
@@ -108,9 +109,10 @@ class Router:
 
             while True:
                 s = json.loads(await websocket.recv())
+                
                 msgtype = s.get('msgtype')
-                logger.info('%s: on_ws: msgtype: %s' % (self, msgtype))
-                logger.debug('%s: on_ws: %s' % (self, s))
+                #logger.info('%s: on_ws: msgtype: %s' % (self, msgtype))
+                #logger.debug('%s: on_ws: %s' % (self, s))
 
                 if msgtype == 'version':
                     logger.info('%s: on_ws: version: %s' % (self, s))
@@ -165,9 +167,13 @@ class Router:
                     self.pkfwdstat['txnb'] += 1
                     token = s['diid']
                     self.pkfwdc.push_txack(token)
-
+                elif msgtype == 'lora':
+                    self.last_xtime = xtime
+                    rxtime = s['upinfo']['rxtime']
+                    rssi = s['upinfo']['rssi']
+                    snr = s['upinfo']['snr']
                 else:
-                    logger.info('%s: on_ws: %s: %s' % (self, msgtype, s))
+                    logger.info('%s: CREO QUE LORA: %s: %s' % (self, msgtype, s))
         except Exception as exc:
             logger.error('%s: server socket failed: %s', self, exc, exc_info=True)
         finally:

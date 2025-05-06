@@ -93,6 +93,7 @@ int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
     if( (len < OFF_df_minlen && ftype != FRMTYPE_PROP) ||
         // (FTYPE_BIT(ftype) & DNFRAME_TYPE) != 0 || --- because of device_mode feature we parse everything
         (frame[OFF_mhdr] & (MHDR_RFU|MHDR_MAJOR)) != MAJOR_V1 ) {
+
         for (int i = 0; i < len; i++) {
             xprintf(lbuf, "%02X ", frame[i]);  // Imprimir el contenido de frame en formato hexadecimal
         } 

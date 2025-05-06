@@ -133,7 +133,8 @@ class PkFwdC():
 
 
     def error_received(self, exc):
-        logger.info("%s: received error: %s" % (self, exc))
+        pass
+        #logger.info("%s: received error: %s" % (self, exc))
 
 
     def connection_lost(self, exc):
