@@ -40,6 +40,13 @@ import router_config
 from router import Router
 from id6 import Id6
 
+import paho.mqtt.client as mqtt
+
+MQTT_BROKER = "localhost"
+MQTT_PORT = 1883
+MQTT_TOPIC = "lora/rx"
+
+
 logger = logging.getLogger('ts2pktfwd')
 
 # All track stations managed by this process. Every web socket connection
@@ -47,9 +54,19 @@ logger = logging.getLogger('ts2pktfwd')
 # at startup time.
 routerid2router = {}    # type:Mapping[Id6,Router]
 
-async def add_router(routerid:'Id6', rconfig:Mapping[str,Any], pkfwduri:str) -> Router:
+mqtt_client = mqtt.Client()
+
+def on_connect(client, userdata, flags, rc):
+    logger.info(f"Connected to MQTT Broker with result code {rc}")
+
+mqtt_client.on_connect = on_connect
+mqtt_client.connect(MQTT_BROKER, MQTT_PORT)
+mqtt_client.loop_start()  # Esto inicia el loop en segundo plano
+
+
+async def add_router(routerid:'Id6', rconfig:Mapping[str,Any], pkfwduri:str, mqtt_client:mqtt.Client) -> Router:
     assert routerid not in routerid2router
-    r = Router(routerid, rconfig, pkfwduri)
+    r = Router(routerid, rconfig, pkfwduri, mqtt_client)
     await r.start()
     routerid2router[routerid] = r
     return r
@@ -223,7 +240,7 @@ async def main(args):
         routerid = Id6(s, 'router')
         logger.info("Instantiating %s" % (routerid))
         rc = router_config.get_router_config(routerid)
-        await add_router(routerid, rc, pkfwduri)
+        await add_router(routerid, rc, pkfwduri, mqtt_client)
 
 
 if __name__ == '__main__':  # pragma:nocover

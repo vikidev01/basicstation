@@ -551,7 +551,7 @@ static void ws_connected_w (aio_t* aio) {
     }
     conn->wend = wend + dlen;
     // Masking value - 0
-    wbuf[wend-4] = wbuf[wend-3] = wbuf[wend-2] = wbuf[wend-1] = 1;
+    wbuf[wend-4] =  wbuf[wend-3] = wbuf[wend-2] = wbuf[wend-1] = 1;
     for( int i=0; i<dlen; i++ )
         wbuf[wend+i] ^= 1;
     goto again;

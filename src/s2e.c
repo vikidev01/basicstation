@@ -63,11 +63,9 @@ static void resetDC (s2ctx_t* s2ctx, u2_t dc_chnlRate) {
     s2ctx->dc_chnlRate = dc_chnlRate;
 }
 
-
 static int s2e_canTxOK (s2ctx_t* s2ctx, txjob_t* txjob, int* ccaDisabled) {
     return 1;
 }
-
 
 void s2e_ini (s2ctx_t* s2ctx) {
     if( s2e_joineuiFilter == NULL )
@@ -90,7 +88,6 @@ void s2e_ini (s2ctx_t* s2ctx) {
     rt_iniTimer(&s2ctx->bcntimer, s2e_bcntimeout);
     s2ctx->bcntimer.ctx = s2ctx;
 }
-
 
 void s2e_free (s2ctx_t* s2ctx) {
     for( int u=0; u < MAX_TXUNITS; u++ )
@@ -217,7 +214,6 @@ static const u2_t DC_EU868BAND_RATE[] = {
     [DC_MILLI]= 1000,
 };
 
-
 static ustime_t _calcAirTime (rps_t rps, u1_t plen, u1_t nocrc, u2_t preamble) {
     if( preamble == 0 )
         preamble = 8;
@@ -303,7 +299,6 @@ static void send_dntxed (s2ctx_t* s2ctx, txjob_t* txjob) {
         txjob->len, &s2ctx->txq.txdata[txjob->off], txjob->len);
 }
 
-
 ustime_t s2e_updateMuxtime(s2ctx_t* s2ctx, double muxstime, ustime_t now) {
     if( now == 0 )
         now = rt_getTime();
@@ -312,11 +307,9 @@ ustime_t s2e_updateMuxtime(s2ctx_t* s2ctx, double muxstime, ustime_t now) {
     return now;
 }
 
-
 rps_t s2e_dr2rps (s2ctx_t* s2ctx, u1_t dr) {
     return dr < 16 ? s2ctx->dr_defs[dr] : RPS_ILLEGAL;
 }
-
 
 // This is called only for received frame (maps only to correct *up* DRs)
 u1_t s2e_rps2dr (s2ctx_t* s2ctx, rps_t rps) {
@@ -326,7 +319,6 @@ u1_t s2e_rps2dr (s2ctx_t* s2ctx, rps_t rps) {
     }
     return DR_ILLEGAL;
 }
-
 
 static void check_dnfreq (s2ctx_t* s2ctx, ujdec_t* ujd, u4_t* pfreq, u1_t* pchnl) {
     sL_t freq = uj_int(ujd);
@@ -479,7 +471,6 @@ static int altTxTime (s2ctx_t* s2ctx, txjob_t* txjob, ustime_t earliest) {
     return 1;
 }
 
-
 static int s2e_canTxEU868 (s2ctx_t* s2ctx, txjob_t* txjob, int* ccaDisabled) {
     ustime_t txtime = txjob->txtime;
     ustime_t band_exp = s2ctx->txunits[txjob->txunit].dc_eu868bands[freq2band(txjob->freq)];
@@ -492,7 +483,6 @@ static int s2e_canTxEU868 (s2ctx_t* s2ctx, txjob_t* txjob, int* ccaDisabled) {
         txjob, txjob->freq, rt_ustime2utc(txtime), rt_ustime2utc(band_exp));
     return 0;
 }
-
 
 static int s2e_canTxPerChnlDC (s2ctx_t* s2ctx, txjob_t* txjob, int* ccaDisabled) {
     ustime_t txtime = txjob->txtime;
@@ -512,7 +502,6 @@ static int s2e_canTxPerChnlDC (s2ctx_t* s2ctx, txjob_t* txjob, int* ccaDisabled)
     return 0;
 }
 
-
 // Add a txjob to the TX queue and insert ordered by txtime.
 // Only basic exclusion constraints are checked for newly arriving txjobs:
 // Independent on antenna choice:
@@ -529,14 +518,15 @@ int s2e_addTxjob (s2ctx_t* s2ctx, txjob_t* txjob, int relocate, ustime_t now) {
     if( !relocate ) {
         // txjob is fresh entry from LNS and not one that got reschduled due to TX conflicts
         ustime_t txtime = txjob->txtime;    //
+        
         txunit = txjob->txunit = ral_rctx2txunit(txjob->rctx);
         txjob->altAnts = ral_altAntennas(txunit);
         updateAirtimeTxpow(s2ctx, txjob);
 
-        if( txtime > now + TX_MAX_AHEAD ) {
+        /*if( txtime > now + TX_MAX_AHEAD ) {
             LOG(MOD_S2E|WARNING, "%J - Tx job too far ahead: %~T", txjob, txtime-now);
             return 0;
-        }
+        }*/
 
         if( txtime < earliest  &&  !altTxTime(s2ctx, txjob, earliest) )
             
@@ -594,7 +584,6 @@ int s2e_addTxjob (s2ctx_t* s2ctx, txjob_t* txjob, int relocate, ustime_t now) {
     }
 }
 
-
 // Analyze TX queue and decide on next action.
 // Return the time when the next action is due if the queue head is not changed.
 // This can be called any time to reevaluate actions.
@@ -648,14 +637,7 @@ ustime_t s2e_nextTxAction (s2ctx_t* s2ctx, u1_t txunit) {
             }
             // Looks like it's on air
             update_DC(s2ctx, curr);
-            
-            
-            
-            
-            
-            
-            
-
+        
             curr->txflags |= TXFLAG_TXCHECKED;
             // sending dntxed here instead @txend gives nwks more time to update/inform muxs (join)
             send_dntxed(s2ctx, curr);
@@ -750,8 +732,6 @@ ustime_t s2e_nextTxAction (s2ctx_t* s2ctx, u1_t txunit) {
     return curr->txtime + TXCHECK_FUDGE;
 }
 
-
-
 static void s2e_txtimeout (tmr_t* tmr) {
     s2ctx_t* s2ctx = tmr->ctx;
     u1_t txunit = (s2txunit_t*)((u1_t*)tmr - offsetof(s2txunit_t, timer)) - s2ctx->txunits;
@@ -760,7 +740,6 @@ static void s2e_txtimeout (tmr_t* tmr) {
         return;
     rt_setTimer(tmr, t);
 }
-
 
 static void s2e_bcntimeout (tmr_t* tmr) {
     s2ctx_t* s2ctx = tmr->ctx;
@@ -863,6 +842,7 @@ inline static void upch_insert (chdefl_t* upchs, uint idx, u4_t freq, u1_t bw, u
     upchs->rps[idx].maxSF = maxSF;
 }
 
+///     QUI SE CONFIGURAN ALGUNOS PARAMETROS QUE SE TRANSMMITIRAN EN LOS MENSAJES LORAWAN
 static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
     char hwspec[MAX_HWSPEC_SIZE] = { 0 };
     ujbuf_t sx130xconf = { .buf=NULL };
@@ -1241,7 +1221,6 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
     return 1;
 }
 
-
 // Obsolete message format - newer servers use dnmsg which carries more context!
 void handle_dnframe (s2ctx_t* s2ctx, ujdec_t* D) {
     ustime_t now = rt_getTime();
@@ -1326,6 +1305,7 @@ void handle_dnframe (s2ctx_t* s2ctx, ujdec_t* D) {
         LOG(MOD_S2E|WARNING, "Some mandatory fields are missing (flags=0x%X)", flags);
         return;
     }
+    
     txjob->txtime = ts_xtime2ustime(txjob->xtime);
     if( txjob->xtime == 0 || txjob->txtime == 0 ) {
         LOG(MOD_S2E|ERROR, "%J - dropped due to time conversion problems (MCU/GPS out of sync, obsolete input) - xtime=%ld", txjob, txjob->xtime);
@@ -1335,7 +1315,6 @@ void handle_dnframe (s2ctx_t* s2ctx, ujdec_t* D) {
     if( !s2e_addTxjob(s2ctx, txjob, /*initial placement*/0, now) )
         txq_freeJob(&s2ctx->txq, txjob);
 }
-
 
 void handle_dnmsg (s2ctx_t* s2ctx, ujdec_t* D) {
     ustime_t now = rt_getTime();
@@ -1519,7 +1498,6 @@ void handle_dnmsg (s2ctx_t* s2ctx, ujdec_t* D) {
         txq_freeJob(&s2ctx->txq, txjob);
 }
 
-
 void handle_dnsched (s2ctx_t* s2ctx, ujdec_t* D) {
     ustime_t now = rt_getTime();
     ujcrc_t field;
@@ -1649,7 +1627,6 @@ void handle_dnsched (s2ctx_t* s2ctx, ujdec_t* D) {
     }
 }
 
-
 void handle_timesync (s2ctx_t* s2ctx, ujdec_t* D) {
     ustime_t rxtime = rt_getTime();
     ustime_t txtime = 0;
@@ -1690,7 +1667,6 @@ void handle_timesync (s2ctx_t* s2ctx, ujdec_t* D) {
     if( txtime && gpstime )
         ts_processTimesyncLns(txtime, rxtime, gpstime);
 }
-
 
 void handle_getxtime (s2ctx_t* s2ctx, ujdec_t* D) {
     // No fields required - skip everything
@@ -1741,7 +1717,6 @@ void handle_getxtime (s2ctx_t* s2ctx, ujdec_t* D) {
     }
 }
 
-
 void handle_runcmd (s2ctx_t* s2ctx, ujdec_t* D) {
     ujcrc_t field;
     char* argv[MAX_CMDARGS+2] = { NULL };
@@ -1784,8 +1759,6 @@ void handle_runcmd (s2ctx_t* s2ctx, ujdec_t* D) {
     argv[argc] = NULL;
     sys_execCommand(0, (str_t*)argv); // 0: detach cmd and don't wait for completion
 }
-
-
 
 // --------------------------------------------------------------------------------
 //
@@ -1877,7 +1850,6 @@ int s2e_onMsg (s2ctx_t* s2ctx, char* json, ujoff_t jsonlen) {
     uj_assertEOF(&D);
     return ok;
 }
-
 
 #if defined(CFG_no_rmtsh)
 void s2e_handleRmtsh (s2ctx_t* s2ctx, ujdec_t* D) {

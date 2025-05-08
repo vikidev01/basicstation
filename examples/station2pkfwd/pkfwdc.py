@@ -53,7 +53,7 @@ MSGTYPE2NAME = {
     PULL_DATA : 'PULL_DATA',
     PULL_RESP : 'PULL_RESP',
     PULL_ACK  : 'PULL_ACK',
-    TX_ACK    : 'TX_ACK',
+    TX_ACK    : 'TX_ACK', #Rta ante un  generar un txpkt y mandarlo
 }
 
 
@@ -114,7 +114,7 @@ class PkFwdC():
 
 
     def datagram_received(self, data, addr):
-        #logger.info("%s: received packet: %s" % (self, data.hex()))
+        #logger.info("%s: -------------------------------------received packet: %s" % (self, data.hex()))
         pver, token, t = struct.unpack('>BHB', data[0:4])
         if pver != PKFWD_VER:
             logger.info("%s: received invalid packet: %s" % (self, data.hex()))
@@ -133,8 +133,7 @@ class PkFwdC():
 
 
     def error_received(self, exc):
-        pass
-        #logger.info("%s: received error: %s" % (self, exc))
+        logger.info("%s: received error: %s" % (self, exc))
 
 
     def connection_lost(self, exc):
@@ -143,8 +142,7 @@ class PkFwdC():
 
     def sendto(self, message:bytes) -> None:
         self.transport.sendto(message)
-
-
+        
     def push_rxpk(self, rxtime:float, tmst:int, chan:int, rfch:int, Freq:int, datr:str, rssi:float, snr:float, pdu_ba:bytes) -> None:
         time = datetime.datetime.utcfromtimestamp(rxtime).isoformat() + 'Z'
         pdu_b64 = base64.b64encode(pdu_ba).decode('ascii')

@@ -34,27 +34,30 @@ import base64
 import datetime
 import copy
 from websockets.server import WebSocketServerProtocol as WSSP
-
+import time
 import router_config
 import pkfwdc
 from id6 import Id6, Eui
 from bgtask import BgTask
 
+import db
+import paho.mqtt.client as mqtt
 
 logger = logging.getLogger('ts2pktfwd')
-
+MQTT_TOPIC = 'router/other'
 
 def xtime2bits32(xtime:int) -> int:
     return xtime & 0xFFFFFFFF
 
 
-class Router:
+class Router:   
     ''' Map Station messages to pkfwd and vice versa. '''
 
-    def __init__(self, routerid:Id6, config:router_config.RouterConfig, pkfwduri:Any) -> None:
+    def __init__(self, routerid:Id6, config:router_config.RouterConfig, pkfwduri:Any, mqtt_client:mqtt.Client) -> None:
         self.routerid = routerid
         self.config = config
         self.pkfwdc = pkfwdc.PkFwdC(pkfwduri, routerid, config, self.on_pull_resp, self.get_pkfwd_stat)
+        self.mqtt_client = mqtt_client
         self.websocket = None           # type:Optional[WSSP]
         empty_list_fn = list            # type: Callable[[],List[Mapping{str,Any]]]
         self.ws_write_bgtask = BgTask(self.ws_write_bgtask_func, empty_list_fn, 'ws_write_bgtask', 10.0)
@@ -91,6 +94,11 @@ class Router:
     async def start(self):
         await self.pkfwdc.start()
 
+    def publish_mqtt(self, topic: str, payload: dict) -> None:
+        try:
+            self.mqtt_client.publish(topic, json.dumps(payload))
+        except Exception as e:
+            logger.error(f"{self}: MQTT publish failed: {e}")
 
     async def on_ws_connect(self, websocket:WSSP):
         ''' Station has been connected. Loop receiving messages on web socket. '''
@@ -117,8 +125,6 @@ class Router:
                     continue  # o break, según si querés cortar la conexión o no
                 
                 msgtype = s.get('msgtype')
-                #logger.info('%s: on_ws: msgtype: %s' % (self, msgtype))
-                #logger.debug('%s: on_ws: %s' % (self, s))
 
                 if msgtype == 'version':
                     logger.info('%s: on_ws: version: %s' % (self, s))
@@ -168,7 +174,30 @@ class Router:
                     rssi = s['upinfo']['rssi']
                     snr = s['upinfo']['snr']
                     self.pkfwdc.push_rxpk(rxtime, xtime2bits32(xtime), self.chan, self.rfch, s['Freq'], datr, rssi, snr, pdu_ba)
+                    token_tx = 1234
+                    # Payload de ejemplo (puede ser cualquier bytearray válido)
+                    payload = b'\x01\x02\x03\x04\x05\x06\x07\x08'
+                    encoded_data = base64.b64encode(payload).decode('ascii')
+                    # Objeto TX válido
+                    data_tx = {
+                        "txpk": {
+                            "imme": True,
+                            "tmst": 1234567, #un nro cualquiera, no se usa el timestamp
+                            "freq": 927.5,
+                            "rfch": 0,
+                            "powe": 14,
+                            "modu": "LORA",
+                            "datr": "SF9BW500", 
+                            "codr": "4/5",
+                            "ipol": False,
+                            "size": len(payload),
+                            "data": encoded_data,
+                            "ncrc": False
+                        }
+                    }
+                    
 
+                    self.pkfwdc.on_pull_resp(token_tx, data_tx)
                 elif msgtype == 'dntxed':
                     self.pkfwdstat['txnb'] += 1
                     token = s['diid']
@@ -184,11 +213,12 @@ class Router:
                     rssi = s['upinfo']['rssi']
                     snr = s['upinfo']['snr']
                     datr = self.config.dr2sfbw.get(s['DR'], 'SF7BW125')  # Valor por defecto
-
-                     
+                    payload = s["payload"]
+                    self.publish_mqtt(MQTT_TOPIC, s)  # Publicar por MQTT aquí 
                     self.pkfwdc.push_rxpk(rxtime, xtime2bits32(xtime), self.chan, self.rfch, s['Freq'], datr, rssi, snr, pdu_ba)
-                    #logger.warning('%s: lora msg sin payload: %s', self, s)
-                    #logger.info('%s: mensaje LORA completo:\n%s', self, json.dumps(s, indent=2))
+                    db.connect_db()
+                    db.save_sqlite(rxtime, s['Freq'], rssi, snr, payload, 0)
+
 
         except Exception as exc:
             logger.error('%s: server socket failed: %s', self, exc, exc_info=True)
