@@ -364,7 +364,7 @@ static int freq2band (u4_t freq) {
 }
 
 static void update_DC (s2ctx_t* s2ctx, txjob_t* txj) {
-    if( s2ctx->region == J_EU868 ) {
+    if( s2ctx->region == J_AU915 ) { //antes J_EU868
         u1_t band = freq2band(txj->freq);
         ustime_t* dcbands = s2ctx->txunits[txj->txunit].dc_eu868bands;
         ustime_t t = dcbands[band];
@@ -523,10 +523,10 @@ int s2e_addTxjob (s2ctx_t* s2ctx, txjob_t* txjob, int relocate, ustime_t now) {
         txjob->altAnts = ral_altAntennas(txunit);
         updateAirtimeTxpow(s2ctx, txjob);
 
-        /*if( txtime > now + TX_MAX_AHEAD ) {
+        if( txtime > now + TX_MAX_AHEAD ) {
             LOG(MOD_S2E|WARNING, "%J - Tx job too far ahead: %~T", txjob, txtime-now);
             return 0;
-        }*/
+        }
 
         if( txtime < earliest  &&  !altTxTime(s2ctx, txjob, earliest) )
             
@@ -606,8 +606,8 @@ ustime_t s2e_nextTxAction (s2ctx_t* s2ctx, u1_t txunit) {
     if( phead[0] == TXIDX_END )
         return USTIME_MAX;
     txjob_t* curr = txq_idx2job(&s2ctx->txq, phead[0]);
-    ustime_t txdelta = curr->txtime - now;
-
+    ustime_t txdelta = curr->txtime - now;  
+    
     if( (curr->txflags & TXFLAG_TXING) ) {
         // Head job in mode TXING
         ustime_t txend = curr->txtime + curr->airtime;
@@ -646,7 +646,6 @@ ustime_t s2e_nextTxAction (s2ctx_t* s2ctx, u1_t txunit) {
     }
     if( txdelta < TX_MIN_GAP ) {
         // Missed TX start time - try alternative or drop frame
-        LOG(MOD_S2E|ERROR, "%J - missed TX time: txdelta=%~T min=%~T", curr, txdelta, TX_MIN_GAP);
       check_alt:
         txq_unqJob(&s2ctx->txq, phead);
         if( !s2e_addTxjob(s2ctx, curr, /*relocate*/1, now) )  // note: might change queue head! (reload @ again)
@@ -655,7 +654,7 @@ ustime_t s2e_nextTxAction (s2ctx_t* s2ctx, u1_t txunit) {
     }
     // Txtime time too far out Head is TXable - is it time to feed the radio?
     if( txdelta > TX_AIM_GAP ) {
-        LOG(MOD_S2E|DEBUG, "%J - next TX start ahead by %~T (%>.6T)",
+       LOG(MOD_S2E|DEBUG, "%J - next TX start ahead by %~T (%>.6T)",
             curr, txdelta, rt_ustime2utc(curr->txtime));
         return curr->txtime - TX_AIM_GAP;
     }
@@ -1467,12 +1466,15 @@ void handle_dnmsg (s2ctx_t* s2ctx, ujdec_t* D) {
     txjob->txunit = ral_rctx2txunit(txjob->rctx);
 
     if( (txjob->txflags & TXFLAG_PING) ) {
+        
         txjob->xtime  = ts_gpstime2xtime(txjob->txunit, txjob->gpstime);
+        LOG(MOD_S2E|WARNING, "xtime antes de gps no debiera entrar: %ld (0x%lX)", txjob->xtime, txjob->xtime);
         txjob->txtime = ts_xtime2ustime(txjob->xtime);
     }
     else {
         if( txjob->xtime != 0 ) {
             txjob->xtime += txjob->rxdelay * 1000000;
+            //LOG(MOD_S2E|WARNING, "xtime antes de ts_xtime2ustime: %ld (0x%lX)", txjob->xtime, txjob->xtime);
             txjob->txtime = ts_xtime2ustime(txjob->xtime);
         }
         if( txjob->freq == 0 ) {
@@ -1489,10 +1491,12 @@ void handle_dnmsg (s2ctx_t* s2ctx, ujdec_t* D) {
             }
         }
     }
+
     if( txjob->xtime == 0 || txjob->txtime == 0 ) {
         LOG(MOD_S2E|ERROR, "%J - dropped due to time conversion problems (MCU/GPS out of sync, obsolete input) - xtime=%ld", txjob, txjob->xtime);
         return;
     }
+
     txq_commitJob(&s2ctx->txq, txjob);
     if( !s2e_addTxjob(s2ctx, txjob, /*initial placement*/0, now) )
         txq_freeJob(&s2ctx->txq, txjob);
@@ -1500,7 +1504,7 @@ void handle_dnmsg (s2ctx_t* s2ctx, ujdec_t* D) {
 
 void handle_dnsched (s2ctx_t* s2ctx, ujdec_t* D) {
     ustime_t now = rt_getTime();
-    ujcrc_t field;
+    ujcrc_t field; 
     while( (field = uj_nextField(D)) ) {
         switch(field) {
         case J_msgtype: {

@@ -152,6 +152,7 @@ class Muxs():
                 return
             r = routerid2router[routerid]
             await r.on_ws_connect(websocket)
+            
         except Exception as exc:
             logger.error('%s: server socket failed: %s', self, exc, exc_info=True)
             return

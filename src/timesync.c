@@ -99,7 +99,6 @@ static int         syncQual_thres;  // current threshold
 // Fwd decl
 static void onTimesyncLns (tmr_t* tmr);
 
-
 static void timesyncReport (int force) {
     ustime_t now = rt_getTime();
     if( !force && now < lastReport + TIMESYNC_REPORTS )
@@ -122,7 +121,6 @@ static void timesyncReport (int force) {
         (ts_xtime2gpstime(ppsSync.pps_xtime) + UTC_GPS_EPOCH_US*PPM - rt_ustime2utc(pps_ustime) + PPM/2)/PPM,
         (ts_xtime2gpstime(ppsSync.pps_xtime) + UTC_GPS_EPOCH_US*PPM - rt_ustime2utc(pps_ustime) + PPM/2)%PPM - PPM/2 );
 }
-
 
 static int encodeDriftPPM (double drift) {
     return (int)round((drift - 1.0) * PPM * iPPM_SCALE);
@@ -162,7 +160,6 @@ static int log_drift_stats (str_t msg, int* drifts, int thresQ, int* auxQ) {
         thresQ, thres / fPPM_SCALE);
     return thres;
 }
-
 
 ustime_t ts_normalizeTimespanMCU (ustime_t timespan) {
     
@@ -315,7 +312,6 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
     return delay;
 }
 
-
 sL_t ts_gpstime2xtime (u1_t txunit, sL_t gpstime) {
     if( txunit >= MAX_TXUNITS || !timesyncs[txunit].xtime || !ppsSync.pps_xtime || ppsOffset < 0 || !gpsOffset ) {
         LOG(MOD_SYN|ERROR, "Cannot convert GPS time - missing %s time sync",
@@ -334,7 +330,6 @@ sL_t ts_gpstime2xtime (u1_t txunit, sL_t gpstime) {
     return txunit==0 ? xtime : xtime2xtime(&ppsSync, &timesyncs[txunit], xtime);
 }
 
-
 sL_t ts_xtime2gpstime (sL_t xtime) {
     if( ppsSync.pps_xtime == 0 ) {
         return 0;
@@ -348,7 +343,6 @@ sL_t ts_xtime2gpstime (sL_t xtime) {
     return gpsOffset + xtime - ppsSync.pps_xtime;
 }
 
-
 sL_t ts_ustime2xtime (u1_t txunit, ustime_t ustime) {
     if( txunit >= MAX_TXUNITS || timesyncs[txunit].xtime == 0 )
         return 0; // cannot convert
@@ -356,9 +350,11 @@ sL_t ts_ustime2xtime (u1_t txunit, ustime_t ustime) {
     return ustime2xtime(sync, ustime);
 }
 
-
 ustime_t ts_xtime2ustime (sL_t xtime) {
     int txunit = ral_xtime2txunit(xtime);
+    //LOG(MOD_SYN|WARNING, "El valor que entra a  xtime =0x%lX", xtime);
+    //LOG(MOD_SYN|WARNING, "El valor de txunit dentro de ts_xtime2ustime =0x%lX", txunit);
+    //LOG(MOD_SYN|WARNING, "El valor de timesyncs----------------------- =0x%lX", timesyncs[txunit].xtime);
     if( txunit >= MAX_TXUNITS || timesyncs[txunit].xtime == 0 ) {
         LOG(MOD_SYN|ERROR, "Cannot convert xtime=0x%lX - missing SX130X#%d time sync",
             timesyncs[txunit].xtime, txunit);
@@ -372,7 +368,6 @@ ustime_t ts_xtime2ustime (sL_t xtime) {
     }
     return xtime2ustime(sync, xtime);
 }
-
 
 sL_t ts_xtime2xtime (sL_t xtime, u1_t dst_txunit) {
     int src_txunit = ral_xtime2txunit(xtime);
@@ -388,7 +383,6 @@ sL_t ts_xtime2xtime (sL_t xtime, u1_t dst_txunit) {
     const timesync_t* dst_sync = &timesyncs[dst_txunit];
     return xtime2xtime(src_sync, dst_sync, xtime);
 }
-
 
 // Convert a 32bit SX130X tick counter into a xtime reported back to the LNS
 // This can only be called in a process with access to libloragw (aka not ral_master)
@@ -408,7 +402,6 @@ sL_t ts_xticks2xtime (u4_t xticks, sL_t last_xtime) {
     return last_xtime + d;
 }
 
-
 sL_t ts_newXtimeSession (u1_t txunit) {
     // This disambiguates SX130X timestamps
     // If we have a new session (currently reconnect to TC) the SX130X counter restarts
@@ -418,7 +411,6 @@ sL_t ts_newXtimeSession (u1_t txunit) {
     ext |= ((sL_t)txunit & RAL_TXUNIT_MASK) << RAL_TXUNIT_SHIFT;
     return ext;
 }
-
 
 // Initialize timesync module - run every time we start a new session
 void ts_iniTimesync () {
@@ -437,15 +429,15 @@ void ts_iniTimesync () {
     sum_mcu_drifts = 0;
     memset(timesyncs, 0, sizeof(timesyncs));
     rt_clrTimer(&syncLnsTmr);
+    //LOG(MOD_SYN|INFO, "----------------------Time sync:: %d\n", timesyncs);
+    
 }
-
 
 // --------------------------------------------------------------------------------
 //
 // Time sync with LNS - maintains gpsOffset
 //
 // --------------------------------------------------------------------------------
-
 
 // Contact server to get a timesync to GPS epoch
 // Repeat this as long as we haven't found a solution.
@@ -479,7 +471,6 @@ static void onTimesyncLns (tmr_t* tmr) {
     LOG(MOD_SYN|DEBUG, "Timesync #%d sent to server", syncLnsCnt);
 }
 
-
 // Server forces inferred GPS time
 void ts_setTimesyncLns (ustime_t xtime, sL_t gpstime) {
     ustime_t ustime = ts_xtime2ustime(xtime);
@@ -494,7 +485,6 @@ void ts_setTimesyncLns (ustime_t xtime, sL_t gpstime) {
     LOG(MOD_SYN|INFO, "Server time sync: xtime=0x%lX gpstime=0x%lX ppsOffset=%ld gpsOffset=0x%lX",
         xtime, gpstime, ppsOffset, gpsOffset);
 }
-
 
 // Server reported back a timestamp - infer GPS second label for a specific PPS edge
 void ts_processTimesyncLns (ustime_t txtime, ustime_t rxtime, sL_t gpstime) {
