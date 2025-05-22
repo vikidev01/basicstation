@@ -28,7 +28,8 @@
 
 #include "s2conf.h"
 #include "uj.h"
-
+#include <time.h>
+#include <sys/time.h>
 
 #define MHDR_FTYPE  0xE0
 #define MHDR_RFU    0x1C
@@ -89,7 +90,9 @@ void bin2hex(char* dst, const u1_t* src, int len) {
 }
 
 int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbuf, bool* is_lorawan) {
-    //LOG(MOD_S2E|DEBUG, "Is a frame: %16.4H", len, frame);
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
     if( len == 0 ) {
     badframe:
         LOG(MOD_S2E|DEBUG, "Not a frame: %16.4H", len, frame);
@@ -97,130 +100,191 @@ int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
     } 
     int ftype = frame[OFF_mhdr] & MHDR_FTYPE;
     // ------------------ TRAMAS NO LORAWAN ---------------------
-    if (len == 16)  {  
-        xprintf(lbuf, "IDENTIFICA QUE ES UN FRAME DE 16 BYTES");
-    }
-    // ------------------ Tramas de estado ---------------------
-    if (len == 35 && frame[0]  == 0x01 &&   // Código DevEUI
-                     frame[9]  == 0x41 &&   // Código FCnt
-                     frame[14] == 0x10 &&   // Código Batería
-                     frame[17] == 0x11 &&   // Código Energía
-                     frame[22] == 0x12 &&   // Código Cantidad (tiempo de carga)
-                     frame[27] == 0x30 &&   // Código Flags
-                     frame[29] == 0x40 &&   // Código Resets
-                     frame[33] == 0x50)  {  // Código Temperatura 
-        uL_t deveui = rt_rlsbf8(&frame[1]);       // 8 bytes
-        xprintf( "----------------------------------------------tiene 35bytes.DevEUI=%:E",deveui);
-        u4_t fcnt   = rt_rlsbf4(&frame[10]);      // 4 bytes
-        u2_t batt   = rt_rlsbf2(&frame[15]);      // 2 bytes
-        u4_t energy = rt_rlsbf4(&frame[18]);      // 4 bytes
-        u4_t carga  = rt_rlsbf4(&frame[23]);      // 4 bytes
-        u1_t flags  = frame[28];                  // 1 byte
-        u4_t resets = frame[30] | (frame[31]<<8) | (frame[32]<<16); // 3 bytes (LSB)
-        u1_t temp   = frame[34];                  // 1 byte
-
-        uj_encKVn(buf,
-            "msgtype",     's', "estado",
-            rt_deveui,     'E', deveui,
-            "FCnt",        'i', fcnt,
-            "Bateria",     'i', batt,
-            "Energia",     'i', energy,
-            "Carga",       'i', carga,
-            "Flags",       'i', flags,
-            "Resets",      'i', resets,
-            "Temperatura", 'i', temp,
-            NULL
-        );
-        xprintf(lbuf, "TRAMA LORA ESTADO: DevEUI=%:E FCnt=%u Batt=%u Ener=%u Carga=%u Flags=0x%02X Resets=%u Temp=%d",
-                deveui, fcnt, batt, energy, carga, flags, resets, temp);
-
-        *is_lorawan = false;
-        return 1;
-    }
-    // ------------------ Tramas gnss & wifi ---------------------
+    // ------------------ Tramas con encabezado ---------------------
     if (len >= 14 && frame[0] == 0x01 && frame[9] == 0x41) {
-        uL_t deveui = rt_rlsbf8(&frame[1]);
-        u4_t fcnt   = rt_rlsbf4(&frame[10]);
+        uL_t deveui =
+            ((uL_t)frame[1] << 56) | ((uL_t)frame[2] << 48) | ((uL_t)frame[3] << 40) | ((uL_t)frame[4] << 32) |
+            ((uL_t)frame[5] << 24) | ((uL_t)frame[6] << 16) | ((uL_t)frame[7] << 8)  | (uL_t)frame[8];
+
+        // FCnt (4 bytes big-endian)
+        u4_t fcnt =
+            ((u4_t)frame[10] << 24) | ((u4_t)frame[11] << 16) | ((u4_t)frame[12] << 8) | (u4_t)frame[13];
+
+        
+        uj_encKV(buf, "DevEUI", 'E', deveui);
+        uj_encKV(buf, "FCnt", 'i', fcnt);
+        uj_encKV(buf, "payload", 'H', len, frame);
+        uj_encKV(buf, "msgtype", 's', "lora");
         u1_t off    = 14;
 
-        uj_encKVn(buf,
-            "msgtype", 's', "gnss_wifi",
-            rt_deveui, 'E', deveui,
-            "FCnt",    'i', fcnt,
-            NULL
-        );
+        while (off < len) {
+            u1_t code = frame[off];
 
-       while (off < len) {
-        u1_t code = frame[off];
+            if (code == 0x61 && off + 2 < len) { // GNSS
+                u1_t size = frame[off + 1];
+                if (off + 2 + size > len) {
+                    xprintf(lbuf, "Error: tamaño de GNSS fuera de rango");
+                    return 0;
+                }
 
-        if (code == 0x61 && off + 2 < len) { // GNSS
-            u1_t size = frame[off + 1];
-            if (off + 2 + size > len) {
-                xprintf(lbuf, "Error: tamaño de GNSS fuera de rango");
-                return 0;
+                // Timestamp (little endian)
+                u4_t ts = frame[off + 2] | (frame[off + 3] << 8) | (frame[off + 4] << 16) | (frame[off + 5] << 24);
+                u4_t status = (frame[off + 6] << 24) | (frame[off + 7] << 16) | (frame[off + 8] << 8) | frame[off + 9];
+                u1_t* gnss_payload = &frame[off + 10];
+                u1_t gnss_len = size - 8;   
+
+                uj_encKVn(buf,
+                    "GNSS_TS",     'i', ts,
+                    "GNSS_Status", 'i', status,
+                    "GNSS",        'H', gnss_len, gnss_payload,
+                    NULL
+                );
+
+                xprintf(lbuf, "GNSS: size:%d ts=%u status=0x%08X gnss_len=%d payload=", size, ts, status, gnss_len);
+                for (int j = 0; j < gnss_len; j++) {
+                    xprintf(lbuf, "%02X", gnss_payload[j]);
+                }
+                xprintf(lbuf, "\n");
+
+
+                off += 2 + size;
+                *is_lorawan = false;
+                
             }
 
-            // Timestamp (little endian)
-            u4_t ts = frame[off + 2] | (frame[off + 3] << 8) | (frame[off + 4] << 16) | (frame[off + 5] << 24);
-            u4_t status = rt_rlsbf4(&frame[off + 6]);
-            u1_t* gnss_payload = &frame[off + 10];
-            u1_t gnss_len = size - 8;
+            else if (code == 0x62 && off + 2 < len) { // WiFi
+                u1_t size = frame[off + 1];
+                if (off + 2 + size > len) {
+                    xprintf(lbuf, "Error: tamaño de WiFi fuera de rango");
+                    return 0;
+                }
 
-            uj_encKVn(buf,
-                "GNSS_TS",     'i', ts,
-                "GNSS_Status", 'i', status,
-                "GNSS",        'H', gnss_len, gnss_payload,
-                NULL
-            );
+                u4_t ts = frame[off + 2] | (frame[off + 3] << 8) | (frame[off + 4] << 16) | (frame[off + 5] << 24);
+                u1_t* balizas = &frame[off + 6];
+                u1_t mac_count = (size - 4) / 8;
 
-            xprintf(lbuf, "GNSS: ts=%u status=0x%08X gnss_len=%d", ts, status, gnss_len);
-            off += 2 + size;
-        }
+                // Buffer temporal para MACs en formato JSON
+                char macs_buf[512] = {0};
+                char* p = macs_buf;
+                *p++ = '[';
 
-        else if (code == 0x62 && off + 2 < len) { // WiFi
-            u1_t size = frame[off + 1];
-            if (off + 2 + size > len) {
-                xprintf(lbuf, "Error: tamaño de WiFi fuera de rango");
-                return 0;
+                for (u1_t i = 0; i < mac_count; i++) {
+                    u1_t* mac = &balizas[i * 8];
+                    u1_t clean_mac[7] = {
+                        mac[0], mac[2], mac[3], mac[4], mac[5], mac[6], mac[7]
+                    };
+
+                    if (i > 0) *p++ = ',';
+                    *p++ = '"';
+                    for (int j = 0; j < 7; j++) {
+                        sprintf(p, "%02X", clean_mac[j]);
+                        p += 2;
+                        if (j < 6) *p++ = ':';  // separador de bytes
+                    }
+                    *p++ = '"';
+                }
+                *p++ = ']';
+                *p = '\0';
+
+                uj_encKVn(buf,
+                    "WiFi_TS",    'i', ts,
+                    "WiFi_MACs",  's', macs_buf,
+                    NULL
+                );
+
+                xprintf(lbuf, "WiFi: ts=%u macs=%u\n", ts, mac_count);
+                for (u1_t i = 0; i < mac_count; i++) {
+                    u1_t* mac = &balizas[i * 8];
+                    u1_t clean_mac[7] = {
+                        mac[0], mac[2], mac[3], mac[4], mac[5], mac[6], mac[7]
+                    };
+                    char mac_str[15 + 1];
+                    bin2hex(mac_str, clean_mac, 7);
+                    xprintf(lbuf, "  MAC[%u]: %s\n", i, mac_str);
+                }
+                off += 2 + size;
+            } else { // Si no es GNSS ni WiFi, entonces es un estado
+                u2_t batt = 0;
+                u4_t energy = 0;
+                u4_t carga = 0;
+                u1_t flags = 0;
+                u4_t resets = 0;
+                u1_t temp = 0;
+
+                bool has_batt = false;
+                bool has_energy = false;
+                bool has_carga = false;
+                bool has_flags = false;
+                bool has_resets = false;
+                bool has_temp = false;
+                bool done = false;
+            
+                while (off < len && !done) {
+                    switch (frame[off]) {
+                        case 0x10:  // Batería (2 bytes big-endian)
+                            batt = (frame[off + 1] << 8) | frame[off + 2];
+                            has_batt = true;
+                            off += 3;
+                            break;
+                        case 0x11:  // Energía (4 bytes big-endian)
+                            energy = (frame[off + 1] << 24) | (frame[off + 2] << 16) | (frame[off + 3] << 8) | frame[off + 4];
+                            has_energy = true;
+                            off += 5;
+                            break;
+                        case 0x12:  // Carga (4 bytes big-endian)
+                            carga = (frame[off + 1] << 24) | (frame[off + 2] << 16) | (frame[off + 3] << 8) | frame[off + 4];
+                            has_carga = true;
+                            off += 5;
+                            break;
+                        case 0x30:  // Flags (1 byte
+                            flags = frame[off + 1];
+                            has_flags = true;
+                            off += 2;
+                            break;
+                        case 0x40:  // Resets (3 bytes big-endian)
+                            resets = (frame[off + 1] << 16) | (frame[off + 2] << 8) | frame[off + 3];
+                            has_resets = true;
+                            off += 4;
+                            break;
+                        case 0x50:  // Temperatura (1 byte)
+                            temp = frame[off + 1];
+                            has_temp = true;
+                            off += 2;
+                            break;
+                        default:
+                            done = true; // Salir del bucle si se encuentra un código desconocido
+                    }
+                }
+                u1_t lens = 0;
+                // Armar el objeto JSON dinámicamente
+                
+                if (has_batt)   {uj_encKV(buf, "Batt",          'i', batt);lens += 3;}
+                if (has_energy) {uj_encKV(buf, "Ener",        'i', energy);lens += 5;}
+                if (has_carga)  {uj_encKV(buf, "Charge ",      'i', carga);lens += 5;}
+                if (has_flags)  {uj_encKV(buf, "Flags",        'i', flags);lens += 2;}
+                if (has_resets) {uj_encKV(buf, "Resets",      'i', resets);lens += 4;}
+                if (has_temp)   {uj_encKV(buf, "Temp",          'i', temp);lens += 2;}
+                uj_encKVn(buf, NULL);
+
+                // Convertir payload binario a string hexadecimal para mostrarlo
+                char hex_payload[2 * len + 1];
+                for (int i = 0; i < len; i++) {
+                    sprintf(&hex_payload[i * 2], "%02X", frame[i]);
+                }
+                hex_payload[2 * len] = '\0';
+
+                // Imprimir log con payload incluido
+                xprintf(lbuf, "payload LORA status: DevEUI=%:E FCnt=%u Batt=%u Ener=%u Charge=%u Flags=0x%02X Resets=%u Temp=%d\n", 
+                        deveui, fcnt, batt, energy, carga, flags, resets, temp);
+              
+
+                *is_lorawan = false;
+                
             }
-
-            u4_t ts = frame[off + 2] | (frame[off + 3] << 8) | (frame[off + 4] << 16) | (frame[off + 5] << 24);
-            u1_t* balizas = &frame[off + 6];
-            u1_t mac_count = (size - 4) / 8;
-
-            // Preparamos lista de MACs procesadas (sin segundo byte)
-            uj_encKVn(buf,
-                "WiFi_TS", 'i', ts,
-                "WiFi_MACs", '[',
-
-                    // Agregamos una por una las MAC de 7 bytes
-                    ']',
-                NULL
-            );
-
-            for (u1_t i = 0; i < mac_count; i++) {
-                u1_t* mac = &balizas[i * 8];
-                u1_t clean_mac[7] = {
-                    mac[0], mac[2], mac[3], mac[4], mac[5], mac[6], mac[7]
-                };
-
-                // Insertamos en el array (fuera de uj_encKVn)
-                uj_encKVn(buf, NULL, '[', 'H', 7, clean_mac, ']', NULL);
-            }
-
-            xprintf(lbuf, "WiFi: ts=%u macs=%u", ts, mac_count);
-            off += 2 + size;
         }
-
-        else {
-            xprintf(lbuf, "Error: Código desconocido en posición %d (0x%02X)", off, code);
-            return 0;
-        }
+        return 1;
     }
-
-    *is_lorawan = false;
-    return 1;
-    }
+   
 
     // Si la trama es menor a 12 bytes o no es FRMTYPE_PROP o el campo MHDR no es igual a MAJOR_V1, no es una trama LoraWAN
     if( (len < OFF_df_minlen && ftype != FRMTYPE_PROP) || (frame[OFF_mhdr] & (MHDR_RFU|MHDR_MAJOR)) != MAJOR_V1 ) {
@@ -284,7 +348,7 @@ int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
         return 0;
     }
     //--------------------- TRAMAS LORAWAN ---------------------
-    u1_t  mhdr  = frame[OFF_mhdr];
+    /*u1_t  mhdr  = frame[OFF_mhdr];
     u1_t  fctrl = frame[OFF_fctrl];
     u2_t  fcnt  = rt_rlsbf2(&frame[OFF_fcnt]);
     s4_t  mic   = (s4_t)rt_rlsbf4(&frame[len-4]);
@@ -304,7 +368,7 @@ int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
     xprintf(lbuf, "%s mhdr=%02X DevAddr=%08X FCtrl=%02X FCnt=%d FOpts=[%H] %4.2H mic=%d (%d bytes) ESTA ES LORAWAN ",
             dir, mhdr, devaddr, fctrl, fcnt, foptslen, &frame[OFF_fopts], max(0, len-4-portoff), &frame[portoff], mic, len);
     *is_lorawan = true; 
-    return 1;
+    return 1;*/
 }
 
 

@@ -49,8 +49,6 @@ MQTT_TOPIC = 'router/other'
 def xtime2bits32(xtime:int) -> int:
     return xtime & 0xFFFFFFFF
 
-start_time = time.time()  # al iniciar el script
-
 
 class Router:   
     ''' Map Station messages to pkfwd and vice versa. '''
@@ -64,9 +62,10 @@ class Router:
         empty_list_fn = list            # type: Callable[[],List[Mapping{str,Any]]]
         self.ws_write_bgtask = BgTask(self.ws_write_bgtask_func, empty_list_fn, 'ws_write_bgtask', 10.0)
         self.ws_write_bgtask.start()
-        
+        self.deveui = None
         self.chan = 0
         self.rfch = 0
+        
         self.pkfwdstat = {
             'lati': 0.0,   # number | GPS latitude of the gateway in degree (float, N is +)
             'long': -0.0,  # number | GPS latitude of the gateway in degree (float, E is +)
@@ -116,7 +115,6 @@ class Router:
 
             await self.pkfwdc.resume()
             await asyncio.sleep(0.3)
-            asyncio.create_task(self.transmitter_loop())
 
             while True:
            
@@ -153,7 +151,7 @@ class Router:
                     rssi = s['upinfo']['rssi']
                     snr = s['upinfo']['snr']
                     datr = self.config.dr2sfbw[s['DR']]
-                    self.pkfwdc.push_rxpk(rxtime, xtime2bits32(xtime), self.chan, self.rfch, s['Freq'], datr, rssi, snr, pdu_ba)
+                    #self.pkfwdc.push_rxpk(rxtime, xtime2bits32(xtime), self.chan, self.rfch, s['Freq'], datr, rssi, snr, pdu_ba)
                 # UPLINK DATAFRAME
                 elif msgtype == 'updf':
                     self.pkfwdstat['rxnb'] += 1
@@ -176,18 +174,16 @@ class Router:
                     rxtime = s['upinfo']['rxtime']
                     rssi = s['upinfo']['rssi']
                     snr = s['upinfo']['snr']
-                    self.pkfwdc.push_rxpk(rxtime, xtime2bits32(xtime), self.chan, self.rfch, s['Freq'], datr, rssi, snr, pdu_ba)
+                    #self.pkfwdc.push_rxpk(rxtime, xtime2bits32(xtime), self.chan, self.rfch, s['Freq'], datr, rssi, snr, pdu_ba)
                     
                 elif msgtype == 'dntxed':
                     self.pkfwdstat['txnb'] += 1
                     token = s['diid']
                     self.pkfwdc.push_txack(token)
                 elif msgtype == 'lora':
-                    # LORA UPLINK FRAME
                     self.pkfwdstat['rxnb'] += 1
                     self.pkfwdstat['rxok'] += 1
                     self.pkfwdstat['rxfw'] += 1
-
                     xtime = s['upinfo']['xtime']
                     self.last_xtime = xtime
                     rxtime = s['upinfo']['rxtime']
@@ -195,22 +191,58 @@ class Router:
                     snr = s['upinfo']['snr']
                     datr = self.config.dr2sfbw.get(s['DR'], 'SF7BW125')  # Valor por defecto
                     payload = s["payload"]
-                    # Convertir el payload hexadecimal en bytes
+                    deveui = s["DevEUI"]
+                    freq = s["Freq"]
+                    self.deveui = deveui
                     pdu_ba = bytes.fromhex(payload)
-                    self.publish_mqtt(MQTT_TOPIC, s)  # Publicar por MQTT aquí
-                    # Llamar a push_rxpk con el payload convertido
+                    self.publish_mqtt(MQTT_TOPIC, s)  
                     self.pkfwdc.push_rxpk(rxtime, xtime2bits32(xtime), self.chan, self.rfch, s['Freq'], datr, rssi, snr, pdu_ba)
-                    db.save_sqlite(rxtime, s['Freq'], rssi, snr, payload, 0)
-                else:
-                    self.pkfwdstat['rxnb'] += 1
-                    self.pkfwdstat['rxok'] += 1
-                    self.pkfwdstat['rxfw'] += 1
-                    xtime = s['upinfo']['xtime']
-                    self.last_xtime = xtime
-                    rxtime = s['upinfo']['rxtime']
-                    rssi = s['upinfo']['rssi']
-                    snr = s['upinfo']['snr']
-                    datr = self.config.dr2sfbw.get(s['DR'], 'SF7BW125')  # Valor por defecto
+                    await self.transmitter(deveui, xtime, freq)
+
+                    # Save the message to the database
+                    db.insert_device_if_not_exists(deveui)
+
+                    message_id = db.insert_message(
+                        deveui=deveui,
+                        datetime=rxtime,
+                        frec=s['Freq'],
+                        rssi=rssi,
+                        snr=snr,
+                        fcnt=s["FCnt"]
+                    )
+
+                    if 'GNSS_TS' in s and 'GNSS_Status' in s and 'GNSS' in s:
+                        db.insert_gnss(
+                            message_id=message_id,
+                            timestamp_scan=s['GNSS_TS'],
+                            status=s['GNSS_Status'],
+                            payload=s['GNSS']
+                        )
+
+                    if 'WiFi_TS' in s and 'WiFi_MACs' in s:
+                        db.insert_wifi(
+                            message_id=message_id,
+                            timestamp_scan=s['WiFi_TS'],
+                            balizas=s['WiFi_MACs']
+                        )
+
+                    if any(k in s for k in ['Batt', 'Ener', 'Charge ', 'Flags', 'Resets', 'Temp']):
+                        batt   = s.get('Batt')
+                        ener   = s.get('Ener')
+                        carga  = s.get('Charge ')
+                        flags  = s.get('Flags')
+                        resets = s.get('Resets')
+                        temp   = s.get('Temp')
+                        db.insert_status(
+                            message_id=message_id,
+                            battery=batt,
+                            energy=ener,
+                            millisec_in_charge=carga,
+                            flag_status=flags,
+                            cant_reset=resets,
+                            temp=temp
+                        )
+                            
                     
 
         except Exception as exc:
@@ -219,42 +251,39 @@ class Router:
             self.websocket = None
             await self.pkfwdc.pause() 
 
-    def get_tmst(self):
-        elapsed = time.time() - start_time  # Tiempo transcurrido desde el inicio
-        return int(elapsed * 1000000) # convertir a microsegundos
-
-    async def transmitter_loop(self):
-
-        payload = b'\x01\x02\x03\x04'
-        token_tx = 345
- 
-        while True:
-            await asyncio.sleep(10) 
-            tmst = self.get_tmst() #que transmita ya 
-            encoded_data = base64.b64encode(payload).decode('ascii')
-            data_tx = {
-                "txpk": {
-                    "imme": True,
-                    "tmms": 0,
-                    "tmst": tmst,
-                    "freq": 927.5,
-                    "rfch": 0,
-                    "powe": 14,
-                    "modu": "LORA",
-                    "datr": "SF9BW500", 
-                    "codr": "4/5",
-                    "ipol": False,
-                    "size": len(payload),
-                    "data": encoded_data,
-                    "ncrc": False
-                } 
-            }
-            self.pkfwdc.on_pull_resp(token_tx, data_tx)
-            payload = bytes((b + 1) % 256 for b in payload)
-            token_tx += 1
-             
+    async def transmitter(self, deveui, xtime, freq):
+        payload = deveui
+        token_tx = 1
+        tmst =  xtime
+        # Determinar el rfch según la frecuencia
+        rfch = 0
+        if 918400000 <= freq < 919200000:
+            rfch = 0
+        elif 919200000 <= freq <= 919800000:
+            rfch = 1
+        encoded_data = payload
+        data_tx = {
+            "txpk": {
+                "imme": True,
+                "tmms": 0,
+                "tmst": tmst,
+                "freq": 927.5,
+                "rfch": rfch,
+                "powe": 14,
+                "modu": "LORA",
+                "datr": "SF8BW500",
+                "codr": "4/5",
+                "ipol": False,
+                "size": len(payload),
+                "data": encoded_data,
+                "ncrc": False
+            } 
+        }
+        self.pkfwdc.on_pull_resp(token_tx, data_tx)
+       
     def get_pkfwd_stat(self) -> MutableMapping[str,Any]:
         return self.pkfwdstat
+
     def on_pull_resp(self, token:int, obj:Any) -> None:
         ''' PULL_RESP from pktfwd socket with downlink for Station. '''
         if 'txpk' not in obj:
@@ -269,9 +298,8 @@ class Router:
         rx2freq = self.config.RX2Freq
         rx1dr = self.config.sfbw2dr[txpk['datr']]
         rx1freq = int(float(txpk['freq'])*1e6)
+        pdu_hex = txpk['data'].replace('-', '')
 
-
-        
         xtime = txpk['tmst'] - int(RxDelay*1e6)
         xtime = (self.last_xtime & 0xFFFFFFFF00000000) | xtime
         dnmsg = {
@@ -280,19 +308,21 @@ class Router:
             'RxDelay':  RxDelay,
             'RX1Freq':  rx1freq,
             'RX1DR':    rx1dr,
-            'RX2DR':    rx2dr, #de donde sale
+            'RX2DR':    rx2dr,
             'RX2Freq':  rx2freq,
             'dC':       0,
-            'pdu':      base64.b64decode(txpk['data'].encode('ascii')).hex(),
+            'pdu':      pdu_hex, 
             'dnmode':   'updn',
             'diid':     token,
             'MuxTime':  datetime.datetime.utcnow().timestamp()
         }
-        dnmsg['DevEui'] = '58-A0-CB-00-0C-30-33-00'
+        if self.deveui is not None:
+            dnmsg['DevEui'] = self.deveui
+        else:
+            dnmsg['DevEui'] = '00-00-00-00-00-00-00-00'  # fallback
 
         if self.config.get_hwspec() == 'sim':
             dnmsg['regionid'] = self.config.get_regionid()
-            dnmsg['DevEui'] = '58-A0-CB-00-0C-30-33-00'
 
         logger.info('%s: on_pull_resp: dnmsg: %s' % (self, dnmsg))
         self.send_ws(dnmsg)

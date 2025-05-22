@@ -157,8 +157,8 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
         rxjob_t* j = &s2ctx->rxq.rxjobs[s2ctx->rxq.first++];
         dbuf_t lbuf = { .buf = NULL };
         if( log_special(MOD_S2E|VERBOSE, &lbuf) )
-            xprintf(&lbuf, "RX %F DR%d %R snr=%.1f rssi=%d xtime=0x%lX - ",
-                    j->freq, j->dr, s2e_dr2rps(s2ctx, j->dr), j->snr/4.0, -j->rssi, j->xtime);
+            //xprintf(&lbuf, "RX %F DR%d %R snr=%.1f rssi=%d xtime=0x%lX - ",
+            //        j->freq, j->dr, s2e_dr2rps(s2ctx, j->dr), j->snr/4.0, -j->rssi, j->xtime);
 
         uj_encOpen(&sendbuf, '{');
         bool is_lorawan = false;

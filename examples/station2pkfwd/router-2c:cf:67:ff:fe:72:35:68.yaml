@@ -10,19 +10,19 @@ station:
   # base region name: EU863, US902
   region: AU915
   # points to region in regions.yaml which defines DRs and upchannels
-  regionid: 1003
+  regionid: 1004 #1003
   sx1302_conf:
   - chan_FSK: {enable: false}
     chan_Lora_std: {enable: false}
-    chan_multiSF_0: {enable: true, if: 0, radio: 0}
-    chan_multiSF_1: {enable: true, if: 0, radio: 0}
-    chan_multiSF_2: {enable: true, if: 0, radio: 0}
-    chan_multiSF_3: {enable: true, if: 0, radio: 0}
-    chan_multiSF_4: {enable: true, if: 0, radio: 1}
-    chan_multiSF_5: {enable: true, if: 0, radio: 1}
-    chan_multiSF_6: {enable: true, if: 0, radio: 1}
-    chan_multiSF_7: {enable: true, if: 0, radio: 1}
-    radio_0: {enable: true, freq: 917200000}
-    radio_1: {enable: true, freq: 918000000}
+    chan_multiSF_0: {enable: true, if: -400000, radio: 0}   # 918400000
+    chan_multiSF_1: {enable: true, if: -200000, radio: 0}   # 918600000
+    chan_multiSF_2: {enable: true, if: 0, radio: 0}         # 918800000
+    chan_multiSF_3: {enable: true, if: 200000, radio: 0}    # 919000000
+    chan_multiSF_4: {enable: true, if: -400000, radio: 1}   # 919200000
+    chan_multiSF_5: {enable: true, if: -200000, radio: 1}   # 919400000
+    chan_multiSF_6: {enable: true, if: 0, radio: 1}         # 919600000
+    chan_multiSF_7: {enable: true, if: 200000, radio: 1}    # 919800000
+    radio_0: {enable: true, freq: 918800000} # 917200000
+    radio_1: {enable: true, freq: 919600000} # 918000000
 pktfwd:
   gateway_ID: "2ccf67fffe723568"
