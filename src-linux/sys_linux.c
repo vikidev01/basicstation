@@ -1095,9 +1095,6 @@ static void startupDaemon (tmr_t* tmr) {
 int sys_main (int argc, char** argv) {
     // Because we log even before rt_ini()...
     rt_utcOffset = sys_utc() - rt_getTime();
-    fprintf(stderr, "quiero ver elsys_utc()plis=%lld\n", (long long)sys_utc());
-    fprintf(stderr, "quiero ver el rt_getTime()plis=%lld\n", (long long)rt_getTime());
-    fprintf(stderr, "quiero ver el rt_uctOffset plis=%lld\n", (long long)rt_utcOffset);
     signal(SIGHUP,  SIG_IGN);
     signal(SIGINT,  handle_signal);
     signal(SIGTERM, handle_signal);

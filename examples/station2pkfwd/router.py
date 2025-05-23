@@ -189,7 +189,8 @@ class Router:
                     rxtime = s['upinfo']['rxtime']
                     rssi = s['upinfo']['rssi']
                     snr = s['upinfo']['snr']
-                    datr = self.config.dr2sfbw.get(s['DR'], 'SF7BW125')  # Valor por defecto
+                    datr = self.config.dr2sfbw.get(s['DR'])  # Valor por defecto
+                    print('-------------------------------------------------------------datr', datr)
                     payload = s["payload"]
                     deveui = s["DevEUI"]
                     freq = s["Freq"]
@@ -297,6 +298,7 @@ class Router:
         rx2dr = self.config.RX2DR
         rx2freq = self.config.RX2Freq
         rx1dr = self.config.sfbw2dr[txpk['datr']]
+        
         rx1freq = int(float(txpk['freq'])*1e6)
         pdu_hex = txpk['data'].replace('-', '')
 

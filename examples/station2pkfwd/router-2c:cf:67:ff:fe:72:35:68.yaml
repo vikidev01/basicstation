@@ -10,7 +10,7 @@ station:
   # base region name: EU863, US902
   region: AU915
   # points to region in regions.yaml which defines DRs and upchannels
-  regionid: 1004 #1003
+  regionid: 1005 #1003
   sx1302_conf:
   - chan_FSK: {enable: false}
     chan_Lora_std: {enable: false}
