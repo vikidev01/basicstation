@@ -162,9 +162,9 @@ static int parse_spread_factor_range (ujdec_t* D) {
         }
         if( sfmin < 7 || sfmin > 12 || sfmin > sfmax || s[0] )
             uj_error(D, "Failed to parse spread factor range (expecting \"num-num\" or \"num\")");
-        return ((MR_SF7 << (sfmax-7+1)) - 1) & ~((MR_SF7 << (sfmin-7)) - 1);
+        return ((MR_SF5 << (sfmax-7+1)) - 1) & ~((MR_SF5 << (sfmin-7)) - 1);
     } else {
-        return MR_SF7 << (uj_intRange(D, 7,12) - 7);
+        return MR_SF5 << (uj_intRange(D, 7,12) - 7);
     }
 }
 
@@ -173,7 +173,7 @@ static int parse_spread_factor (ujdec_t* D) {
     sL_t sf = uj_int(D);
     if( sf < 7 || sf > 12 )
         uj_error(D, "Illegal spread_factor value: %ld (must be 7,..,12)", sf);
-    return MR_SF7 << (sf-7);
+    return MR_SF5 << (sf-7);
 }
 
 
@@ -618,7 +618,7 @@ int sx1301v2conf_parse_setup (struct sx1301v2conf* sx1301v2conf, int slaveIdx,
                 chanc->bandwidth = lnsconfs[i].lsaChan.bandwidth;
             }
             else {
-                chanc->modrate = MR_SF7_12;
+                chanc->modrate = MR_SF5_12;
                 chanc->bandwidth = BW_125K;
             }
         }

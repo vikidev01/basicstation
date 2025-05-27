@@ -58,6 +58,8 @@ static const u2_t SF_MAP[] = {
     [SF9  ]= DR_LORA_SF9,
     [SF8  ]= DR_LORA_SF8,
     [SF7  ]= DR_LORA_SF7,
+    [SF6  ]= DR_LORA_SF6,
+    [SF5  ]= DR_LORA_SF5,
     [FSK  ]= DR_UNDEFINED,
     [SFNIL]= DR_UNDEFINED,
 };
@@ -85,11 +87,16 @@ static int to_bw (int lgw_bw) {
 }
 
 
-rps_t ral_lgw2rps (struct lgw_pkt_rx_s* p) {
-    return p->modulation == MOD_LORA
-        ? rps_make(to_sf(p->datarate), to_bw(p->bandwidth))
-        : FSK;
+rps_t ral_lgw2rps(struct lgw_pkt_rx_s* p) {
+    rps_t rps;
+    if (p->modulation == MOD_LORA) {
+       rps = rps_make(to_sf(p->datarate), to_bw(p->bandwidth));
+    } else {
+        rps = FSK;
+    }
+    return rps;
 }
+
 
 
 void ral_rps2lgw (rps_t rps, struct lgw_pkt_tx_s* p) {
@@ -338,7 +345,7 @@ static void rxpolling (tmr_t* tmr) {
 #endif
         rxjob->snr   = (s1_t)(pkt_rx.snr*4);
         rps_t rps = ral_lgw2rps(&pkt_rx);
-        rxjob->dr = s2e_rps2dr(&TC->s2ctx, rps);
+        rxjob->dr = s2e_rps2dr(&TC->s2ctx, rps);/////////////////////////////////PROBLEMA AQUIII
         if( rxjob->dr == DR_ILLEGAL ) {
             log_rawpkt(ERROR, "Dropped RX frame - unable to map to an up DR: ", &pkt_rx);
             continue;

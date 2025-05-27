@@ -41,7 +41,7 @@ int  s2e_parse_lora_frame(ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
 void s2e_make_beacon (uint8_t* layout, sL_t epoch_secs, int infodesc, double lat, double lon, uint8_t* buf);
 
 
-enum { SF12, SF11, SF10, SF9, SF8, SF7, FSK, SFNIL };
+enum { SF12, SF11, SF10, SF9, SF8, SF7, SF6, SF5, FSK, SFNIL };
 enum { BW125, BW250, BW500, BWNIL };
 enum { RPS_DNONLY = 0x20 };
 enum { RPS_BCN = 0x40 };

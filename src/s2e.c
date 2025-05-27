@@ -172,23 +172,24 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
         double reftime = 0.0;
         if( s2ctx->muxtime ) {
             reftime = s2ctx->muxtime +
-                ts_normalizeTimespanMCU(rt_getTime()-s2ctx->reftime) / 1e6;
+            ts_normalizeTimespanMCU(rt_getTime()-s2ctx->reftime) / 1e6;
         }
         uj_encKVn(&sendbuf,
-                  "RefTime",  'T', reftime,
-                  "DR",       'i', j->dr,
-                  "Freq",     'i', j->freq,
-                  "upinfo",   '{',
-                  /**/ "rctx",    'I', j->rctx,
-                  /**/ "xtime",   'I', j->xtime,
-                  /**/ "gpstime", 'I', ts_xtime2gpstime(j->xtime),
-                  /**/ "fts",     'i', j->fts,
-                  /**/ "rssi",    'i', -(s4_t)j->rssi,
-                  /**/ "snr",     'g', j->snr/4.0,
-                  /**/ "rxtime",  'T', rt_getUTC()/1e6,
-                  "}",
-                  NULL);
+              "RefTime",  'T', reftime,
+              "DR",       'i', j->dr,
+              "Freq",     'i', j->freq,
+              "upinfo",   '{',
+              /**/ "rctx",    'I', j->rctx,
+              /**/ "xtime",   'I', j->xtime,
+              /**/ "gpstime", 'I', ts_xtime2gpstime(j->xtime),
+              /**/ "fts",     'i', j->fts,
+              /**/ "rssi",    'i', -(s4_t)j->rssi,
+              /**/ "snr",     'g', j->snr/4.0,
+              /**/ "rxtime",  'T', rt_getUTC()/1e6,
+              "}",
+              NULL);
         uj_encClose(&sendbuf, '}');
+        
         if( !xeos(&sendbuf) ) {
             LOG(MOD_S2E|ERROR, "JSON encoding exceeds available buffer space: %d", sendbuf.bufsize);
         } else {
@@ -256,6 +257,7 @@ static ustime_t _calcAirTime (rps_t rps, u1_t plen, u1_t nocrc, u2_t preamble) {
         div >>= sfx-4;
         sfx = 4;
     }
+    //printf("tmp-------=%d sfx-------=%d div--------=%d\n", tmp, sfx, div);
     return (((ustime_t)tmp << sfx) * rt_seconds(1) + div/2) / div;
 }
 
@@ -314,9 +316,11 @@ rps_t s2e_dr2rps (s2ctx_t* s2ctx, u1_t dr) {
 // This is called only for received frame (maps only to correct *up* DRs)
 u1_t s2e_rps2dr (s2ctx_t* s2ctx, rps_t rps) {
     for( u1_t dr=0; dr<DR_CNT; dr++ ) {
-        if( s2ctx->dr_defs[dr] == rps )
+        if( s2ctx->dr_defs[dr] == rps ) {
             return dr;
+        }
     }
+    printf("  no match found, returning DR_ILLEGAL=%u\n", DR_ILLEGAL);
     return DR_ILLEGAL;
 }
 

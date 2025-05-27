@@ -136,6 +136,9 @@ static u4_t airtime (int datarate, int bandwidth, int plen) {
     case DR_LORA_SF9 : sf = SF9 ; break;
     case DR_LORA_SF8 : sf = SF8 ; break;
     case DR_LORA_SF7 : sf = SF7 ; break;
+    case DR_LORA_SF6 : sf = SF6 ; break;
+    case DR_LORA_SF5 : sf = SF5 ; break;
+    default: sf = SFNIL; break;
     }
 #elif defined(CFG_lgw2)
     switch(bandwidth) {
@@ -151,6 +154,9 @@ static u4_t airtime (int datarate, int bandwidth, int plen) {
     case MR_SF9 : sf = SF9 ; break;
     case MR_SF8 : sf = SF8 ; break;
     case MR_SF7 : sf = SF7 ; break;
+    case MR_SF6 : sf = SF6 ; break;
+    case MR_SF5 : sf = SF5 ; break;
+    default: sf = SFNIL; break;
     }
 #endif
     return s2e_calcDnAirTime(rps_make(sf,bw), plen, /*addcrc*/0, /*preamble*/0);
@@ -660,7 +666,7 @@ brd_cfg_priv[SX1301AR_MAX_BOARD_NB];
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #define CHAN_IF_MAX         1500000     /* filter has ~3 MHz bandwidth */
-#define MULTI_DEFAULT_SF    MR_SF7_10   /* LoRa multi-SF default SFs */
+#define MULTI_DEFAULT_SF    MR_SF5_10   /* LoRa multi-SF default SFs */
 #define LSA_DEFAULT_BW      BW_125K     /* LoRa stand-alone default bandwidth */
 #define LSA_DEFAULT_SF      10          /* LoRa stand-alone default SF */
 #define FSK_DEFAULT_BW      BW_125K     /* FSK default bandwidth */
@@ -1363,6 +1369,8 @@ sx1301ar_modr_t sx1301ar_sf_nb2enum( int x )
 {
     switch( x )
     {
+    case 5 : return MR_SF5;
+    case 6 : return MR_SF6;
     case 7 : return MR_SF7;
     case 8 : return MR_SF8;
     case 9 : return MR_SF9;
@@ -1379,6 +1387,8 @@ int sx1301ar_sf_enum2nb( sx1301ar_modr_t x )
 {
     switch( x )
     {
+    case MR_SF5 : return 5;
+    case MR_SF6 : return 6;
     case MR_SF7 : return 7;
     case MR_SF8 : return 8;
     case MR_SF9 : return 9;
@@ -1395,9 +1405,37 @@ sx1301ar_modr_t sx1301ar_sf_range_nb2enum( int a, int b )
 {
     switch( a )
     {
+    case 5 :
+        switch( b )
+        {
+        case 5 : return MR_SF5
+        case 6 : return MR_SF5_6;
+        case 7 : return MR_SF6_7;
+        case 8 : return MR_SF6_8;
+        case 9 : return MR_SF6_9;
+        case 10: return MR_SF6_10;
+        case 11: return MR_SF6_11;
+        case 12: return MR_SF6_12;
+        default: return MR_UNDEFINED;
+        }
+    case 6 :
+        switch( b )
+        {
+        case 5 : return MR_SF5_6;
+        case 6 : return MR_SF6;
+        case 7 : return MR_SF6_7;
+        case 8 : return MR_SF6_8;
+        case 9 : return MR_SF6_9;
+        case 10: return MR_SF6_10;
+        case 11: return MR_SF6_11;
+        case 12: return MR_SF6_12;
+        default: return MR_UNDEFINED;
+        }
     case 7 :
         switch( b )
         {
+        case 5 : return MR_SF5_7;
+        case 6 : return MR_SF6_7;
         case 7 : return MR_SF7;
         case 8 : return MR_SF7_8;
         case 9 : return MR_SF7_9;
@@ -1409,6 +1447,8 @@ sx1301ar_modr_t sx1301ar_sf_range_nb2enum( int a, int b )
     case 8 :
         switch( b )
         {
+        case 5 : return MR_SF5_8;
+        case 6 : return MR_SF6_8;
         case 7 : return MR_SF7_8;
         case 8 : return MR_SF8;
         case 9 : return MR_SF8_9;
@@ -1420,6 +1460,8 @@ sx1301ar_modr_t sx1301ar_sf_range_nb2enum( int a, int b )
     case 9 :
         switch( b )
         {
+        case 5 : return MR_SF5_9;
+        case 6 : return MR_SF6_9;
         case 7 : return MR_SF7_9;
         case 8 : return MR_SF8_9;
         case 9 : return MR_SF9;
@@ -1431,6 +1473,8 @@ sx1301ar_modr_t sx1301ar_sf_range_nb2enum( int a, int b )
     case 10:
         switch( b )
         {
+        case 5 : return MR_SF5_10;
+        case 6 : return MR_SF6_10;
         case 7 : return MR_SF7_10;
         case 8 : return MR_SF8_10;
         case 9 : return MR_SF9_10;
@@ -1442,6 +1486,8 @@ sx1301ar_modr_t sx1301ar_sf_range_nb2enum( int a, int b )
     case 11:
         switch( b )
         {
+        case 5 : return MR_SF5_11;
+        case 6 : return MR_SF6_11;
         case 7 : return MR_SF7_11;
         case 8 : return MR_SF8_11;
         case 9 : return MR_SF9_11;
@@ -1453,6 +1499,8 @@ sx1301ar_modr_t sx1301ar_sf_range_nb2enum( int a, int b )
     case 12:
         switch( b )
         {
+        case 5 : return MR_SF5_12;
+        case 6 : return MR_SF6_12;
         case 7 : return MR_SF7_12;
         case 8 : return MR_SF8_12;
         case 9 : return MR_SF9_12;
@@ -1471,6 +1519,21 @@ int sx1301ar_sf_min_enum2nb( sx1301ar_modr_t x )
 {
     switch( x )
     {
+    case MR_SF5    : return 5;
+    case MR_SF5_6  : return 5;
+    case MR_SF5_7  : return 5;
+    case MR_SF5_8  : return 5;
+    case MR_SF5_9  : return 5;
+    case MR_SF5_10 : return 5;
+    case MR_SF5_11 : return 5;
+    case MR_SF5_12 : return 5;
+    case MR_SF6    : return 6;
+    case MR_SF6_7  : return 6;
+    case MR_SF6_8  : return 6;
+    case MR_SF6_9  : return 6;
+    case MR_SF6_10 : return 6;
+    case MR_SF6_11 : return 6;
+    case MR_SF6_12 : return 6;
     case MR_SF7    : return 7;
     case MR_SF7_8  : return 7;
     case MR_SF7_9  : return 7;
@@ -1502,6 +1565,21 @@ int sx1301ar_sf_max_enum2nb( sx1301ar_modr_t x )
 {
     switch( x )
     {
+    case MR_SF5    : return 5;
+    case MR_SF5_6  : return 6;
+    case MR_SF5_7  : return 7;
+    case MR_SF5_8  : return 8;
+    case MR_SF5_9  : return 9;
+    case MR_SF5_10 : return 10;
+    case MR_SF5_11 : return 11;
+    case MR_SF5_12 : return 12;
+    case MR_SF6    : return 6;
+    case MR_SF6_7  : return 7;
+    case MR_SF6_8  : return 8;
+    case MR_SF6_9  : return 9;
+    case MR_SF6_10 : return 10;
+    case MR_SF6_11 : return 11;
+    case MR_SF6_12 : return 12;
     case MR_SF7    : return 7;
     case MR_SF7_8  : return 8;
     case MR_SF7_9  : return 9;

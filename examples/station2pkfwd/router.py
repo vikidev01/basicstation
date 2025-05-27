@@ -190,7 +190,6 @@ class Router:
                     rssi = s['upinfo']['rssi']
                     snr = s['upinfo']['snr']
                     datr = self.config.dr2sfbw.get(s['DR'])  # Valor por defecto
-                    print('-------------------------------------------------------------datr', datr)
                     payload = s["payload"]
                     deveui = s["DevEUI"]
                     freq = s["Freq"]

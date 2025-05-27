@@ -13,7 +13,7 @@ station:
   regionid: 1005 #1003
   sx1302_conf:
   - chan_FSK: {enable: false}
-    chan_Lora_std: {enable: false}
+    chan_Lora_std:  {enable: false} # 91880000
     chan_multiSF_0: {enable: true, if: -400000, radio: 0}   # 918400000
     chan_multiSF_1: {enable: true, if: -200000, radio: 0}   # 918600000
     chan_multiSF_2: {enable: true, if: 0, radio: 0}         # 918800000
