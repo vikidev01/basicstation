@@ -68,7 +68,6 @@ class RouterConfig:
 
         self.dr2sfbw = DR2SFBW(station)
         self.sfbw2dr = SFBW2DR(station)
-        print('DR2SFBW: %s' % (self.dr2sfbw))
         self.RxDelay  = 1
 
         region = station['region']

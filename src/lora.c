@@ -274,7 +274,7 @@ int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
                 hex_payload[2 * len] = '\0';
 
                 // Imprimir log con payload incluido
-                xprintf(lbuf, "payload LORA status: DevEUI=%:E FCnt=%u Batt=%u Ener=%u Charge=%u Flags=0x%02X Resets=%u Temp=%d\n", 
+                xprintf(lbuf, "FRAME LORA: DevEUI=%:E FCnt=%u Batt=%u Ener=%u Charge=%u Flags=0x%02X Resets=%u Temp=%d\n", 
                         deveui, fcnt, batt, energy, carga, flags, resets, temp);
               
 
