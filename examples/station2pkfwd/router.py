@@ -266,8 +266,8 @@ class Router:
             "txpk": {
                 "imme": True,
                 "tmms": 0,
-                "tmst": tmst,
-                "freq": 927.5,
+                "tmst": tmst+ 1000000,
+                "freq": 924.5,
                 "rfch": rfch,
                 "powe": 14,
                 "modu": "LORA",
