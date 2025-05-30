@@ -39,6 +39,12 @@ REGION_CONFIG_KEYWORDS = [ 'upchannels', 'DRs' ]
 
 STATION_CONFIG_KEYWORDS = [ 'JoinEui', 'NetID', 'bcning', 'regionid' ]  # and more ..
 
+REGION_RX2_FREQS = {
+    'EU863': [869525000],  # solo una
+    'US902': [923300000],
+    'AU915': [923300000, 923900000, 924500000, 925100000, 925700000, 926300000, 926900000, 927500000],
+}
+
 class Region:
     def __init__(self, o:Mapping[str,Any]):
         self.name = o['name']
@@ -71,18 +77,13 @@ class RouterConfig:
         self.RxDelay  = 1
 
         region = station['region']
-        if region == 'EU863':
-            self.RX2DR = 0
-            self.RX2Freq = 869525000
-        elif region == 'US902':
-            self.RX2DR = 8
-            self.RX2Freq = 923300000
-        elif region == 'AU915':
-            self.RX2DR = 8
-            self.RX2Freq = 924500000 #Antes era 923300000
-        else:
+        if region not in REGION_RX2_FREQS:
             raise Exception('Unsupported region: %s' % (region))
 
+        self.RX2DR = 0 if region == 'EU863' else 8
+
+        self.RX2Freq = REGION_RX2_FREQS[region][0] 
+        
         pktfwd = config['pktfwd']
         self.pktfwd = pktfwd
         if 'gateway_ID' not in pktfwd:

@@ -49,6 +49,17 @@ MQTT_TOPIC = 'router/other'
 def xtime2bits32(xtime:int) -> int:
     return xtime & 0xFFFFFFFF
 
+RX1_TO_RX2_FREQ_MAP = {
+    918400000: 923300000,
+    918600000: 923900000,
+    918800000: 924500000,
+    919000000: 925100000,
+    919200000: 925700000,
+    919400000: 926300000,
+    919600000: 926900000,
+    919800000: 927500000,
+    919100000: 923300000  # caso adicional
+}
 
 class Router:   
     ''' Map Station messages to pkfwd and vice versa. '''
@@ -262,12 +273,13 @@ class Router:
         elif 919200000 <= freq <= 919800000:
             rfch = 1
         encoded_data = payload
+        downlink_freq = RX1_TO_RX2_FREQ_MAP.get(freq, 924500000)
         data_tx = {
             "txpk": {
                 "imme": True,
                 "tmms": 0,
                 "tmst": tmst+ 1000000,
-                "freq": 924.5,
+                "freq": downlink_freq/ 1e6, 
                 "rfch": rfch,
                 "powe": 14,
                 "modu": "LORA",
